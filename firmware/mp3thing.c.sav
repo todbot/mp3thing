@@ -1,0 +1,128 @@
+/**
+ * mp3thing --
+ *
+ * 
+ * Some info on the 2GB Sylvania MP3 player
+ * - Charges via USB, powered USB hub will charge
+ * - Running current: -16mA normal, -20mA peak when changing tracks
+ * - Charging current: up to +110mA ? 
+ * - 110mA NiMH battery
+ * - Power switch directly connected to battery
+ * - On power on
+ * -- Takes ~5 sec to start playing
+ * -- Starts playing first track from start
+ * -- Starts at not max-volume (8 steps to max volume?)
+ * - Approx 32 steps between min/max volume
+ * - Plays tracks in the "Trash"
+ * - 
+ * 
+ * Anonymous MicroSD Clip player
+ * - Starts up within 2 seconds
+ * - Resumes playing where it left off
+ * - Can't seem to get it to act as MicroSD card reader
+ * - Running current: -36-40mA (use at least 40 for calcs)
+ * - Charge current: +120mA
+ * - Runs on 3 x AAA NiMH batteries (1.2V, Rayovac hybrid)
+ * -- run time: approx 20 hours continuous
+ * -- effective mAh = 20 * 40 = 800 mAh
+ *
+ */
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/sleep.h>
+#include <util/delay.h>      
+#include <stdint.h>
+
+/*
+// this is for normal BlinkM, using software PWM
+#define PIN_RED  PB3
+#define PIN_GRN  PB4
+#define PIN_BLU  PB1
+
+#define PIN_SDA  PB0
+#define PIN_SCL  PB2
+
+#define PIN_LED  PB1
+*/
+
+#define PIN_SW1 PB3
+#define PIN_SW2 PB4
+#define PIN_SW3 PB0
+#define PIN_SW4 PB1
+
+
+uint32_t tick;
+
+// compatibility layer
+#if defined(__AVR_ATtiny13__)
+#define WDIE WDTIE
+#endif
+
+// while sleeping, draws 7uA
+void sleep_sec(uint8_t x) 
+{
+  while (x--) {
+     // set the WDT to wake us up!
+    WDTCR |= (1 << WDCE) | (1 << WDE); // enable watchdog & enable changing it
+    WDTCR = (1<< WDE) | (1 <<WDP2) | (1 << WDP1);
+    WDTCR |= (1<< WDIE);
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    sleep_enable();
+    sleep_mode();
+    sleep_disable();
+  }
+}
+SIGNAL(WDT_vect) 
+{
+  WDTCR |= (1 << WDCE) | (1 << WDE);
+  WDTCR = 0;
+}
+
+
+/*
+ *
+ */
+int main( void )
+{
+    WDTCR |= (1 << WDCE) | (1 << WDE);
+    WDTCR = 0;
+    //CLKPR = _BV( CLKPCE );
+    //CLKPR = (_BV(CLKPS2) | _BV(CLKPS1));
+
+    DDRB |= _BV( PIN_LED );
+        
+    // set up periodic timer
+    ///TCCR1 =  _BV( CS13 ) | _BV( CS11 ) | _BV( CS10 ); 
+    //TIFR  |= _BV( TOV1 );
+    //TIMSK |= _BV( TOIE1 );
+
+    //MCUCR = (1<<SM1)|(1<<SE); //Setup Power-down mode and enable sleep
+    // enable watchdog timer
+    //WDTCR |= (1 << WDCE) | (1 << WDE);
+    //WDTCR = 0;
+
+    sei();                      // enable interrupts
+
+    // run forever
+    for(;;) {
+        PORTB |=  _BV( PIN_LED );
+        sleep_sec(1);
+        //_delay_ms(500);
+        PORTB &=~ _BV( PIN_LED );
+        sleep_sec(1);
+        //_delay_ms(500);
+    }
+    
+} // end
+
+
+// 
+// Called on overflow (256 counts) of Timer0.
+//
+ISR(SIG_OVERFLOW0)
+{
+    tick++;
+}
+
+
