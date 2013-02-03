@@ -31,8 +31,8 @@
 
 
 #MCU=attiny85
-MCU=attiny45
-#MCU=attiny25
+#MCU=attiny45
+MCU=attiny25
 #MCU = attiny13
 
 # if MCU is attinyx5
