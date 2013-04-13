@@ -109,6 +109,7 @@ void set_switch( uint8_t switchid, uint8_t val )
         PORTB &=~ _BV( switchid );
 }
 
+// turn all switches to the same state
 void set_switch_all( uint8_t val )
 {
     set_switch( SWA, val );
@@ -117,9 +118,15 @@ void set_switch_all( uint8_t val )
     set_switch( SWD, val );
 }
 
-void do_polaroid_clip(void)
+// Pinout:
+// SWA - play button
+// SWB - prev track button
+// SWC - headphone plugged in detect
+// SWD - LED / unused
+// this version of the Polaroid Clip would auto play at last position
+// so we just need to "back track" 
+void do_polaroid_clipv1(void)
 {
-
     DDRB |= SW_MASK;
     set_switch_all( 0 );
 
@@ -128,7 +135,7 @@ void do_polaroid_clip(void)
     //sleep_sec(2);
     _delay_ms(1000);
     for( uint8_t i=0; i<8; i++ ) { 
-        set_switch( SWB, 1 );
+        set_switch( SWB, 1 );  // prev track
         set_switch( SWD, 1 );
         _delay_ms(100);
         set_switch( SWB, 0 );
@@ -138,20 +145,64 @@ void do_polaroid_clip(void)
 
     _delay_ms(100);
 
-    set_switch( SWC, 1 );
-    set_switch( SWD, 1 );
+    set_switch( SWC, 1 );  // headphone plugged in
+    set_switch( SWD, 1 );  // LED
     _delay_ms(500);
-    set_switch( SWD, 0 );
+    set_switch( SWD, 0 );  // LED
     
     for(;;) {
-        set_switch( SWD, 1 );
+        set_switch( SWD, 1 ); // pulse LED
         sleep_sec(1);
-        set_switch( SWD, 0 );
+        set_switch( SWD, 0 ); // 
         sleep_sec(1);
     }
 
 }
 
+// Pinout:
+// SWA - play button
+// SWB - prev track button
+// SWC - headphone plugged in detect
+// SWD - LED / unused
+//
+// maybe this technique
+// 1. t=0: Power applied
+// 2. t=100: headphone jack switch closed
+// 3. t=200: play button pressed
+// 4. t=300: LEDs cycled
+void do_polaroid_clipv2(void)
+{
+    DDRB |= SW_MASK;
+    set_switch_all( 0 );        // unpush all buttons/connections
+
+    sei();                      // enable interrupts
+
+    set_switch( SWD, 1 ); // LED on
+    set_switch( SWC, 1 ); // headphone plugged in
+
+    set_switch( SWA, 1 ); // play button pressed
+    _delay_ms(300);
+    set_switch( SWA, 0 ); // play button released
+
+    for( uint8_t i=0; i<8; i++ ) { 
+        set_switch( SWB, 1 ); // prev track press
+        set_switch( SWD, 1 );  // LED
+        _delay_ms(300);
+        set_switch( SWB, 0 ); // prev track released
+        set_switch( SWD, 0 );  // LED
+        _delay_ms(300);
+    }
+
+    _delay_ms(200);
+    
+    for(;;) {
+        set_switch( SWD, 1 );  // LED
+        sleep_sec(1);
+        set_switch( SWD, 0 );  // LED
+        sleep_sec(1);
+    }
+
+}
 
 /*
  *
@@ -161,7 +212,8 @@ int main( void )
     WDTCR |= (1 << WDCE) | (1 << WDE);
     WDTCR = 0;
 
-    do_polaroid_clip();
+    do_polaroid_clipv1();
+    //do_polaroid_clipv2();
     
 } 
 
