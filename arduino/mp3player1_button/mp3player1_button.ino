@@ -17,14 +17,15 @@
 #include <Adafruit_VS1053.h>
 #include <SD.h>
 
-#include <CapacitiveSensor.h>
+#define MP3_TRACKNAME  "TRACK01.MP3"
+
+const boolean IS_METAL_BOX = true;
+
+const boolean debug = true;
 
 #define ledPin 13
+#define buttonPin A0
 
-// These are the pins used for the breakout example
-#define BREAKOUT_RESET  9      // VS1053 reset pin (output)
-#define BREAKOUT_CS     10     // VS1053 chip select pin (output)
-#define BREAKOUT_DCS    8      // VS1053 Data/command select pin (output)
 // These are the pins used for the music maker shield
 #define SHIELD_RESET  -1      // VS1053 reset pin (unused!)
 #define SHIELD_CS     7      // VS1053 chip select pin (output)
@@ -35,16 +36,9 @@
 // DREQ should be an Int pin, see http://arduino.cc/en/Reference/attachInterrupt
 #define DREQ 3       // VS1053 Data request, ideally an Interrupt pin
 
-const boolean debug = true;
-
 Adafruit_VS1053_FilePlayer musicPlayer = 
-  // create breakout-example object!
-  //Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, CARDCS);
   // create shield-example object!
   Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
-
-const int capsenseThreshold1 = 30;
-CapacitiveSensor   cs_4_2 = CapacitiveSensor(A0,A2);        // 10M resistor between pins 4 & 2, pi
 
 int volStart = 0;
 int vol;
@@ -68,65 +62,18 @@ void blinkError( int speed )
   }
 }
 
-uint32_t lastPressTime;
-uint32_t lastReleaseTime;
-boolean pressed;
-boolean doublePress;
-boolean newpress;
-
-//
-void touchMeasure()
+boolean buttonPressed()
 {
-  long total1 =  cs_4_2.capacitiveSensor(30);
-  newpress = ( total1 > capsenseThreshold1 );
-  doublePress = false;
-
-  if( pressed && newpress ) {   // maybe double-click
-    if( (millis() - lastPressTime ) <  500 ) { // double click
-      Serial.println("!");
-      doublePress = true;
-    }
-    lastPressTime = millis();
-  }
-  else if( pressed && !newpress ) { // just released
-    lastReleaseTime = millis();
-    pressed = false;
-  }
-  else if( !pressed && newpress ) { // just pressed
-    lastPressTime = millis();
-    lastReleaseTime = lastPressTime;
-    pressed = true;
-  }
-
-  if(debug) {
-    char dstr[80];
-    int secs            = millis()/100;
-    int secsLastPress   = lastPressTime/100;
-    int secsLastRelease = lastReleaseTime/100;
-    sprintf(dstr, "%d:\t%d %d %d", total1, newpress, pressed, doublePress);
-    Serial.print(dstr);
-    sprintf(dstr, "- %d %d %d\n", secs, secsLastPress, secsLastRelease);
-    Serial.print(dstr);
-  }
-}
-//
-boolean touchPressed()
-{
-  return newpress;
-}
-
-//
-boolean touchDoublePressed()
-{
-  //if( lastTouchTime  ) { 
-  // }
+    return (!digitalRead( buttonPin));
 }
 
 //
 void setup() 
 {
   Serial.begin(9600);
-  Serial.println("Capsense MP3 Test");
+  Serial.println("mp3player1_button");
+
+  pinMode( buttonPin, INPUT_PULLUP );
 
   // initialise the music player
   if (! musicPlayer.begin()) { // initialise the music player
@@ -171,7 +118,7 @@ void loop()
   //musicPlayer.playFullFile("jaxx-rom.mp3");
 
   // Start playing a file, then we can do stuff while waiting for it to finish
-  if (! musicPlayer.startPlayingFile("track002.mp3")) {
+  if (! musicPlayer.startPlayingFile( MP3_TRACKNAME )) {
     Serial.print("Could not open file");
     return;
   }
@@ -180,13 +127,23 @@ void loop()
   while (musicPlayer.playingMusic) {
     // file is now playing in the 'background' so now's a good time
     // to do something else like handling LEDs or buttons :)
-    touchMeasure();
-    if( touchPressed() ) { 
+
+    if( buttonPressed() ) { 
+      Serial.println("pressed!");
       vol = volStart;
     }
-    vol++;
+
+    // decay volume (higher is quieter)
+    if( IS_METAL_BOX ) {
+      vol += 3;
+    } else { // wooden box
+      vol++;
+    }
     //vol = (vol * 3) / 2;
-    if( vol >= 200 ) vol = 200;
+
+    if( vol >= 200 ) {
+      vol = 200;
+    }
 
     musicPlayer.setVolume( vol, vol );
     delay(50);
